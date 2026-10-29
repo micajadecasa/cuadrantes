@@ -16,6 +16,7 @@ import {
   User as UserIcon,
   LogOut,
   ShieldCheck,
+  Receipt,
 } from 'lucide-react';
 import { GasteizLogo } from '../constants/logo';
 
@@ -30,6 +31,7 @@ interface HeaderProps {
   onToggleMobileView: () => void;
   onOpenConvenio: () => void;
   onOpenReport: () => void;
+  onOpenNomina?: () => void;
   onOpenGoogleSync: () => void;
   onOpenSaveDrive: () => void;
   onOpenUploadBackup: () => void;
@@ -58,6 +60,7 @@ export const Header: React.FC<HeaderProps> = ({
   onToggleMobileView,
   onOpenConvenio,
   onOpenReport,
+  onOpenNomina,
   onOpenGoogleSync,
   onOpenSaveDrive,
   onOpenUploadBackup,
@@ -143,7 +146,7 @@ export const Header: React.FC<HeaderProps> = ({
               onChange={e => onYearChange(Number(e.target.value))}
               className="bg-transparent text-sm font-semibold text-blue-400 focus:outline-none cursor-pointer"
             >
-              {[2027, 2028, 2029, 2030].map(y => (
+              {[2024, 2025, 2026, 2027, 2028, 2029, 2030].map(y => (
                 <option key={y} value={y} className="bg-slate-900 text-white">
                   {y}
                 </option>
@@ -228,6 +231,16 @@ export const Header: React.FC<HeaderProps> = ({
             <span className="sm:hidden">Gmail</span>
           </button>
 
+          {/* Nóminas Oficiales (PDF y Modelo Álava) */}
+          <button
+            onClick={onOpenNomina}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-lg bg-gradient-to-r from-blue-700 to-indigo-700 hover:from-blue-600 hover:to-indigo-600 text-white transition shadow-sm cursor-pointer border border-blue-500/40"
+            title="Gestión y cálculo de Nóminas Oficiales (Modelo Oficial PDF de Álava)"
+          >
+            <Receipt className="w-3.5 h-3.5 text-amber-300" />
+            <span>Nóminas Oficiales</span>
+          </button>
+
           {/* Reports */}
           <button
             onClick={onOpenReport}
@@ -235,7 +248,7 @@ export const Header: React.FC<HeaderProps> = ({
             title="Informe de Nómina de Gasteiz de Vigilancia"
           >
             <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-            <span className="hidden md:inline">Informe Nómina</span>
+            <span className="hidden md:inline">Informe General</span>
           </button>
 
           {/* Convenio config */}

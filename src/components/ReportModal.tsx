@@ -33,6 +33,7 @@ interface ReportModalProps {
   coverage: Record<number, number>;
   convenio: ConvenioSettings;
   onOpenExportPdf?: () => void;
+  onOpenNomina?: () => void;
 }
 
 const MONTH_NAMES_ES = [
@@ -54,6 +55,7 @@ export const ReportModal: React.FC<ReportModalProps> = ({
   coverage,
   convenio,
   onOpenExportPdf,
+  onOpenNomina,
 }) => {
   const [selectedEmpId, setSelectedEmpId] = useState<string>('ALL');
   const [copied, setCopied] = useState(false);
@@ -161,6 +163,19 @@ export const ReportModal: React.FC<ReportModalProps> = ({
               {copied ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
               <span>{copied ? 'Copiado' : 'Copiar'}</span>
             </button>
+            {onOpenNomina && (
+              <button
+                onClick={() => {
+                  onClose();
+                  onOpenNomina();
+                }}
+                className="flex items-center gap-1 px-3 py-1.5 text-xs font-bold rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white transition shadow-xs"
+                title="Abrir Nómina Oficial de Seguridad Privada (Modelo PDF)"
+              >
+                <Euro className="w-3.5 h-3.5 text-amber-300" />
+                <span>Nómina Modelo PDF</span>
+              </button>
+            )}
             <button
               onClick={handleExportPDF}
               className="flex items-center gap-1 px-3 py-1.5 text-xs font-semibold rounded-lg bg-rose-600 hover:bg-rose-700 text-white transition shadow-xs"
@@ -361,6 +376,18 @@ export const ReportModal: React.FC<ReportModalProps> = ({
                   <span className="text-xl font-black text-emerald-700">
                     {currentEmpStats.estimatedSalary.totalGross.toFixed(2)} €
                   </span>
+                  {onOpenNomina && (
+                    <button
+                      onClick={() => {
+                        onClose();
+                        onOpenNomina();
+                      }}
+                      className="mt-1 inline-flex items-center gap-1 text-[11px] font-bold text-indigo-700 hover:text-indigo-900 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 px-2 py-0.5 rounded cursor-pointer transition shadow-2xs"
+                    >
+                      <Euro className="w-3 h-3 text-indigo-600" />
+                      <span>Ver Nómina Oficial (PDF) →</span>
+                    </button>
+                  )}
                 </div>
               </div>
 

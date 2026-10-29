@@ -30,6 +30,7 @@ import { NotificationModal } from './components/NotificationModal';
 import { ConfirmModal } from './components/ConfirmModal';
 import { DriveBackupModal } from './components/DriveBackupModal';
 import { ExportPdfModal } from './components/ExportPdfModal';
+import { NominaModal } from './components/NominaModal';
 import { LoginPage } from './components/LoginPage';
 import { UserRole } from './services/authSheetService';
 import { logout } from './services/calendarService';
@@ -57,9 +58,8 @@ const STORAGE_KEYS = {
 export default function App() {
   const [year, setYear] = useState<number>(() => {
     const saved = localStorage.getItem(STORAGE_KEYS.YEAR);
-    const parsed = saved ? Number(saved) : 2027;
-    // Si estaba guardado 2025 o 2026, forzar 2027
-    return parsed === 2025 || parsed === 2026 ? 2027 : parsed;
+    const parsed = saved ? Number(saved) : 2026;
+    return parsed && parsed >= 2024 && parsed <= 2030 ? parsed : 2026;
   });
 
   const [month, setMonth] = useState<number>(() => {
@@ -154,6 +154,7 @@ export default function App() {
   const [isDriveBackupOpen, setIsDriveBackupOpen] = useState(false);
   const [driveBackupInitialMode, setDriveBackupInitialMode] = useState<'save' | 'load'>('save');
   const [isExportPdfOpen, setIsExportPdfOpen] = useState(false);
+  const [isNominaOpen, setIsNominaOpen] = useState(false);
 
   // Auth gate state (DB_cuadrantes verification)
   const [authenticatedUser, setAuthenticatedUser] = useState<User | null>(null);
@@ -470,6 +471,7 @@ export default function App() {
         onToggleMobileView={() => setIsMobileView(prev => !prev)}
         onOpenConvenio={() => setIsConvenioOpen(true)}
         onOpenReport={() => setIsReportOpen(true)}
+        onOpenNomina={() => setIsNominaOpen(true)}
         onOpenGoogleSync={() => setIsGoogleSyncOpen(true)}
         onOpenSaveDrive={() => {
           setDriveBackupInitialMode('save');
@@ -661,6 +663,7 @@ export default function App() {
         coverage={coverage}
         convenio={convenio}
         onOpenExportPdf={() => setIsExportPdfOpen(true)}
+        onOpenNomina={() => setIsNominaOpen(true)}
       />
 
       <EmployeeModal
@@ -717,6 +720,16 @@ export default function App() {
         convenio={convenio}
         customHolidays={customHolidays}
         yearAssignmentsMap={yearAssignmentsMap}
+      />
+
+      <NominaModal
+        isOpen={isNominaOpen}
+        onClose={() => setIsNominaOpen(false)}
+        year={year}
+        month={month}
+        employees={employees}
+        statsMap={statsMap}
+        convenio={convenio}
       />
     </div>
   );

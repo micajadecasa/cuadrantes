@@ -14,6 +14,10 @@ import {
   Copy,
   Check,
   Globe,
+  Users,
+  HelpCircle,
+  ChevronDown,
+  ChevronUp,
 } from 'lucide-react';
 import { GasteizLogo } from '../constants/logo';
 import { googleSignIn, logout, signInWithGsi } from '../services/calendarService';
@@ -40,6 +44,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
   const [verificationResult, setVerificationResult] = useState<VerificationResult | null>(null);
   const [manualSheetInput, setManualSheetInput] = useState<string>(() => getSavedSpreadsheetId() || DEFAULT_DB_SPREADSHEET_ID);
   const [showManualInput, setShowManualInput] = useState(false);
+  const [showOauthGuide, setShowOauthGuide] = useState(false);
   const [copiedDomain, setCopiedDomain] = useState<string | null>(null);
 
   const currentHostname = typeof window !== 'undefined' ? window.location.hostname : '';
@@ -105,6 +110,23 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
         return;
       }
 
+      const isAccessDeniedTesting =
+        err?.code === 'auth/access-denied' ||
+        err?.message?.includes('access_denied') ||
+        err?.message?.includes('Error 403') ||
+        (err?.message?.includes('403') && !err?.message?.includes('permission'));
+
+      if (isAccessDeniedTesting) {
+        setVerificationResult({
+          authorized: false,
+          role: null,
+          email: '',
+          error: 'ACCESS_DENIED_TESTING',
+          errorMessage: 'Error 403 (access_denied): La aplicación está en periodo de prueba en Google Cloud y solo admite testers registrados o publicar la app.',
+        });
+        return;
+      }
+
       if (err?.code === 'auth/popup-closed-by-user') {
         errorMsg = 'Se cerró la ventana de inicio de sesión de Google antes de completar los permisos. Pulsa de nuevo en Continuar para permitir el acceso.';
       } else if (err?.code === 'auth/cancelled-popup-request') {
@@ -162,6 +184,22 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
       }
     } catch (err: any) {
       console.error('Error con GSI:', err);
+      const isAccessDeniedTesting =
+        err?.message?.includes('access_denied') ||
+        err?.message?.includes('Error 403') ||
+        (err?.message?.includes('403') && !err?.message?.includes('permission'));
+
+      if (isAccessDeniedTesting) {
+        setVerificationResult({
+          authorized: false,
+          role: null,
+          email: '',
+          error: 'ACCESS_DENIED_TESTING',
+          errorMessage: 'Error 403 (access_denied): La aplicación está en periodo de prueba en Google Cloud y solo admite testers registrados o publicar la app.',
+        });
+        return;
+      }
+
       setVerificationResult({
         authorized: false,
         role: null,
@@ -538,8 +576,73 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
             </div>
           )}
 
+          {/* 6b. Access Denied - OAuth Consent Screen in Testing Mode (Error 403) */}
+          {!isAuthenticating && verificationResult && verificationResult.error === 'ACCESS_DENIED_TESTING' && (
+            <div className="flex flex-col space-y-4">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 bg-rose-500/10 text-rose-400 rounded-xl border border-rose-500/20 shrink-0">
+                  <ShieldAlert className="w-6 h-6" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-white">
+                    Error 403: access_denied
+                  </h3>
+                  <p className="text-[11px] text-amber-400 font-semibold">
+                    App en periodo de prueba en Google Cloud
+                  </p>
+                </div>
+              </div>
+
+              <div className="bg-slate-950/80 border border-slate-800 rounded-xl p-3.5 space-y-3 text-xs">
+                <p className="text-slate-300 leading-relaxed text-[11px]">
+                  El proyecto Google Cloud de la aplicación está actualmente en estado <strong>&ldquo;En periodo de prueba&rdquo;</strong> (Testing). En este modo, Google solo permite iniciar sesión al desarrollador y a las cuentas agregadas a la lista de <strong>Usuarios de prueba</strong>.
+                </p>
+
+                <div className="p-2.5 bg-blue-950/40 border border-blue-800/40 rounded-lg space-y-1.5">
+                  <div className="text-[11px] font-bold text-blue-300">
+                    Opción 1: Publicar la app (Recomendada)
+                  </div>
+                  <p className="text-[10px] text-slate-300 leading-relaxed">
+                    Cambia el estado de &ldquo;Pruebas&rdquo; a &ldquo;En producción&rdquo;. Así cualquier usuario de Google podrá autenticarse (y tu app solo dejará pasar a los que estén en tu hoja <strong className="text-white">DB_cuadrantes</strong>).
+                  </p>
+                </div>
+
+                <div className="p-2.5 bg-slate-900 border border-slate-800 rounded-lg space-y-1.5">
+                  <div className="text-[11px] font-bold text-slate-300 flex items-center gap-1.5">
+                    <Users className="w-3.5 h-3.5 text-amber-400" />
+                    <span>Opción 2: Añadir a Usuarios de prueba</span>
+                  </div>
+                  <p className="text-[10px] text-slate-400 leading-relaxed">
+                    Si deseas mantenerla en pruebas privadas, añade el email de los trabajadores en la sección <strong>&ldquo;Usuarios de prueba&rdquo;</strong> (+ ADD USERS) en Google Cloud Console.
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex flex-col gap-2 pt-1">
+                <a
+                  href="https://console.cloud.google.com/apis/credentials/consent?project=gen-lang-client-0728322381"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs transition shadow-md cursor-pointer"
+                >
+                  <span>Abrir Consentimiento OAuth en Google Cloud</span>
+                  <ExternalLink className="w-3.5 h-3.5" />
+                </a>
+
+                <button
+                  type="button"
+                  onClick={handleGoogleLogin}
+                  className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-semibold text-xs transition cursor-pointer"
+                >
+                  <RefreshCw className="w-3.5 h-3.5" />
+                  <span>Reintentar con Google</span>
+                </button>
+              </div>
+            </div>
+          )}
+
           {/* 7. Default / Ready to Sign In State */}
-          {!isAuthenticating && (!verificationResult || (!verificationResult.authorized && verificationResult.error !== 'USER_NOT_AUTHORIZED' && verificationResult.error !== 'NO_SPREADSHEET_FOUND' && verificationResult.error !== 'SHEET_READ_ERROR' && verificationResult.error !== 'AUTH_FAILED' && verificationResult.error !== 'UNAUTHORIZED_DOMAIN')) && (
+          {!isAuthenticating && (!verificationResult || (!verificationResult.authorized && verificationResult.error !== 'USER_NOT_AUTHORIZED' && verificationResult.error !== 'NO_SPREADSHEET_FOUND' && verificationResult.error !== 'SHEET_READ_ERROR' && verificationResult.error !== 'AUTH_FAILED' && verificationResult.error !== 'UNAUTHORIZED_DOMAIN' && verificationResult.error !== 'ACCESS_DENIED_TESTING')) && (
             <div className="flex flex-col items-center text-center space-y-5">
               <div className="p-3 bg-blue-500/10 text-blue-400 rounded-xl border border-blue-500/20">
                 <Lock className="w-6 h-6" />
@@ -587,6 +690,44 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
                 <span>Base de datos:</span>
                 <span className="font-semibold text-slate-200">DB_cuadrantes</span>
                 <span className="text-[10px] px-1.5 py-0.2 bg-slate-800 text-emerald-300 rounded border border-slate-700">Hoja 1</span>
+              </div>
+
+              {/* Troubleshooting toggle */}
+              <div className="w-full pt-1">
+                <button
+                  type="button"
+                  onClick={() => setShowOauthGuide(!showOauthGuide)}
+                  className="w-full flex items-center justify-center gap-1.5 text-[11px] text-slate-400 hover:text-slate-300 transition py-1 cursor-pointer"
+                >
+                  <HelpCircle className="w-3.5 h-3.5 text-slate-400" />
+                  <span>¿Error 403 / access_denied con otros usuarios?</span>
+                  {showOauthGuide ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+                </button>
+
+                {showOauthGuide && (
+                  <div className="mt-2 text-left bg-slate-950/80 border border-slate-800 rounded-xl p-3 text-[11px] space-y-2 animate-in fade-in duration-200">
+                    <p className="text-slate-300 leading-relaxed">
+                      Si el administrador entra pero otro usuario recibe <strong>Error 403: access_denied</strong> (&ldquo;La app se está probando&rdquo;), se debe al modo de prueba en Google Cloud:
+                    </p>
+                    <div className="space-y-1.5 text-slate-400 pl-1">
+                      <p>
+                        <strong className="text-emerald-400">Opción 1:</strong> Pulsa <strong>&ldquo;PUBLICAR LA APP&rdquo;</strong> en Google Cloud Console para que pueda autenticarse cualquier cuenta de Google.
+                      </p>
+                      <p>
+                        <strong className="text-amber-400">Opción 2:</strong> En la sección <strong>&ldquo;Usuarios de prueba&rdquo;</strong>, pulsa <strong>+ ADD USERS</strong> y añade los Gmails permitidos.
+                      </p>
+                    </div>
+                    <a
+                      href="https://console.cloud.google.com/apis/credentials/consent?project=gen-lang-client-0728322381"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="mt-1 flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-blue-400 hover:text-blue-300 font-semibold text-[11px] transition"
+                    >
+                      <span>Abrir Configuración en Google Cloud Console</span>
+                      <ExternalLink className="w-3 h-3" />
+                    </a>
+                  </div>
+                )}
               </div>
             </div>
           )}
