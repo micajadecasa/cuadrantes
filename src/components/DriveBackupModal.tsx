@@ -23,7 +23,7 @@ import {
   listDriveBackups,
   downloadBackupFromDrive,
 } from '../services/driveService';
-import { googleSignIn, logout, initAuth } from '../services/calendarService';
+import { googleSignIn, logout, initAuth, AppUser } from '../services/calendarService';
 import { User } from 'firebase/auth';
 
 interface DriveBackupModalProps {
@@ -42,7 +42,7 @@ export const DriveBackupModal: React.FC<DriveBackupModalProps> = ({
   initialMode = 'save',
 }) => {
   const [activeTab, setActiveTab] = useState<'save' | 'load'>('save');
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<User | AppUser | null>(null);
   const [isLoggingIn, setIsLoggingIn] = useState(false);
   const [isSavingDrive, setIsSavingDrive] = useState(false);
   const [driveFiles, setDriveFiles] = useState<DriveFileInfo[]>([]);

@@ -20,6 +20,7 @@ import {
   generateICSContent,
   downloadICSFile,
   ShiftCalendarEvent,
+  AppUser,
 } from '../services/calendarService';
 import { User } from 'firebase/auth';
 
@@ -51,7 +52,7 @@ export const GoogleSyncModal: React.FC<GoogleSyncModalProps> = ({
   month,
   year,
 }) => {
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<User | AppUser | null>(null);
   const [token, setToken] = useState<string | null>(null);
   const [isLoggingIn, setIsLoggingIn] = useState(false);
   const [selectedEmpId, setSelectedEmpId] = useState<string>(

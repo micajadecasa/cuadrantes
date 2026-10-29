@@ -22,11 +22,80 @@ provider.setCustomParameters({
   prompt: 'select_account consent',
 });
 
+export interface AppUser {
+  uid: string;
+  email: string | null;
+  displayName: string | null;
+  photoURL?: string | null;
+}
+
 let cachedAccessToken: string | null = null;
 let isSigningIn = false;
 
+export const signInWithGsi = (): Promise<{ user: AppUser; accessToken: string }> => {
+  return new Promise((resolve, reject) => {
+    const google = (window as any).google;
+    if (!google?.accounts?.oauth2) {
+      reject(new Error('Google Identity Services no está disponible en este momento.'));
+      return;
+    }
+
+    try {
+      const client = google.accounts.oauth2.initTokenClient({
+        client_id: firebaseConfig.oAuthClientId,
+        scope:
+          'email profile openid https://www.googleapis.com/auth/calendar.events https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/spreadsheets.readonly https://www.googleapis.com/auth/drive.readonly',
+        prompt: 'select_account consent',
+        callback: async (response: any) => {
+          if (response.error) {
+            reject(new Error(response.error_description || response.error));
+            return;
+          }
+          if (!response.access_token) {
+            reject(new Error('No se recibió el token de acceso de Google'));
+            return;
+          }
+
+          cachedAccessToken = response.access_token;
+
+          try {
+            const userInfoRes = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+              headers: { Authorization: `Bearer ${response.access_token}` },
+            });
+            const info = await userInfoRes.json();
+
+            const appUser: AppUser = {
+              uid: info.sub || 'google-user',
+              email: info.email || null,
+              displayName: info.name || info.given_name || info.email || 'Usuario Google',
+              photoURL: info.picture || null,
+            };
+
+            resolve({ user: appUser, accessToken: response.access_token });
+          } catch (profileErr) {
+            console.warn('No se pudo obtener el perfil de userinfo:', profileErr);
+            resolve({
+              user: {
+                uid: 'google-user',
+                email: null,
+                displayName: 'Usuario Google',
+                photoURL: null,
+              },
+              accessToken: response.access_token,
+            });
+          }
+        },
+      });
+
+      client.requestAccessToken();
+    } catch (e) {
+      reject(e);
+    }
+  });
+};
+
 export const initAuth = (
-  onAuthSuccess?: (user: User, token: string) => void,
+  onAuthSuccess?: (user: User | AppUser, token: string) => void,
   onAuthFailure?: () => void
 ) => {
   return onAuthStateChanged(auth, async (user: User | null) => {
@@ -44,9 +113,9 @@ export const initAuth = (
   });
 };
 
-export const googleSignIn = async (): Promise<{ user: User; accessToken: string } | null> => {
+export const googleSignIn = async (): Promise<{ user: User | AppUser; accessToken: string } | null> => {
+  isSigningIn = true;
   try {
-    isSigningIn = true;
     const result = await signInWithPopup(auth, provider);
     const credential = GoogleAuthProvider.credentialFromResult(result);
     if (!credential?.accessToken) {
@@ -57,6 +126,15 @@ export const googleSignIn = async (): Promise<{ user: User; accessToken: string 
     return { user: result.user, accessToken: cachedAccessToken };
   } catch (error: any) {
     console.error('Error al iniciar sesión con Google:', error);
+    if (error?.code === 'auth/unauthorized-domain' && (window as any).google?.accounts?.oauth2) {
+      console.log('Firebase auth/unauthorized-domain detectado. Probando Google Identity Services directo...');
+      try {
+        const gsiResult = await signInWithGsi();
+        return gsiResult;
+      } catch (gsiErr) {
+        console.warn('GSI fallback falló o fue cancelado:', gsiErr);
+      }
+    }
     throw error;
   } finally {
     isSigningIn = false;
@@ -68,7 +146,11 @@ export const getAccessToken = async (): Promise<string | null> => {
 };
 
 export const logout = async () => {
-  await signOut(auth);
+  try {
+    await signOut(auth);
+  } catch {
+    // Ignore if not signed in through Firebase
+  }
   cachedAccessToken = null;
 };
 

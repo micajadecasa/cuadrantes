@@ -10,9 +10,13 @@ import {
   RefreshCw,
   ArrowRight,
   ShieldAlert,
+  ExternalLink,
+  Copy,
+  Check,
+  Globe,
 } from 'lucide-react';
 import { GasteizLogo } from '../constants/logo';
-import { googleSignIn, logout } from '../services/calendarService';
+import { googleSignIn, logout, signInWithGsi } from '../services/calendarService';
 import {
   verifyUserInDbCuadrantes,
   getSavedSpreadsheetId,
@@ -25,17 +29,28 @@ import {
 import { User } from 'firebase/auth';
 
 interface LoginPageProps {
-  onLoginSuccess: (user: User, role: UserRole, sheetTitle?: string) => void;
+  onLoginSuccess: (user: any, role: UserRole, sheetTitle?: string) => void;
 }
 
 export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
   const [isAuthenticating, setIsAuthenticating] = useState(false);
   const [authStep, setAuthStep] = useState<string>('');
-  const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [currentUser, setCurrentUser] = useState<any | null>(null);
   const [cachedToken, setCachedToken] = useState<string | null>(null);
   const [verificationResult, setVerificationResult] = useState<VerificationResult | null>(null);
   const [manualSheetInput, setManualSheetInput] = useState<string>(() => getSavedSpreadsheetId() || DEFAULT_DB_SPREADSHEET_ID);
   const [showManualInput, setShowManualInput] = useState(false);
+  const [copiedDomain, setCopiedDomain] = useState<string | null>(null);
+
+  const currentHostname = typeof window !== 'undefined' ? window.location.hostname : '';
+
+  const handleCopyText = (text: string) => {
+    navigator.clipboard.writeText(text);
+    setCopiedDomain(text);
+    setTimeout(() => {
+      setCopiedDomain(null);
+    }, 2500);
+  };
 
   const handleGoogleLogin = async () => {
     setIsAuthenticating(true);
@@ -75,6 +90,21 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
     } catch (err: any) {
       console.error('Error durante el inicio de sesión:', err);
       let errorMsg = err?.message || 'Error al iniciar sesión con Google.';
+      const isUnauthorizedDomain =
+        err?.code === 'auth/unauthorized-domain' ||
+        err?.message?.includes('unauthorized-domain');
+
+      if (isUnauthorizedDomain) {
+        setVerificationResult({
+          authorized: false,
+          role: null,
+          email: '',
+          error: 'UNAUTHORIZED_DOMAIN',
+          errorMessage: 'El dominio de la aplicación no está en la lista de dominios autorizados de Firebase Console.',
+        });
+        return;
+      }
+
       if (err?.code === 'auth/popup-closed-by-user') {
         errorMsg = 'Se cerró la ventana de inicio de sesión de Google antes de completar los permisos. Pulsa de nuevo en Continuar para permitir el acceso.';
       } else if (err?.code === 'auth/cancelled-popup-request') {
@@ -89,6 +119,55 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
         email: currentUser?.email || '',
         error: 'AUTH_FAILED',
         errorMessage: errorMsg,
+      });
+    } finally {
+      setIsAuthenticating(false);
+    }
+  };
+
+  const handleDirectGsiLogin = async () => {
+    setIsAuthenticating(true);
+    setVerificationResult(null);
+    setAuthStep('Conectando directamente con Google Identity Services...');
+
+    try {
+      const signInResult = await signInWithGsi();
+      if (!signInResult || !signInResult.accessToken) {
+        throw new Error('No se completó la autenticación con Google.');
+      }
+
+      const { user, accessToken } = signInResult;
+      setCurrentUser(user);
+      setCachedToken(accessToken);
+
+      setAuthStep('Consultando permisos en DB_cuadrantes...');
+
+      const result = await verifyUserInDbCuadrantes(
+        user.email || '',
+        accessToken,
+        manualSheetInput
+      );
+
+      setVerificationResult(result);
+
+      if (result.authorized && result.role) {
+        setAuthStep('Acceso concedido. Entrando...');
+        setTimeout(() => {
+          onLoginSuccess(user, result.role as UserRole, result.spreadsheetTitle);
+        }, 500);
+      } else {
+        if (result.error === 'NO_SPREADSHEET_FOUND' || result.error === 'SHEET_READ_ERROR') {
+          setShowManualInput(true);
+        }
+      }
+    } catch (err: any) {
+      console.error('Error con GSI:', err);
+      setVerificationResult({
+        authorized: false,
+        role: null,
+        email: currentUser?.email || '',
+        error: 'AUTH_FAILED',
+        errorMessage: err?.message || 'No se pudo completar el acceso con Google Identity Services.',
       });
     } finally {
       setIsAuthenticating(false);
@@ -362,8 +441,105 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
             </div>
           )}
 
-          {/* 6. Default / Ready to Sign In State */}
-          {!isAuthenticating && (!verificationResult || (!verificationResult.authorized && verificationResult.error !== 'USER_NOT_AUTHORIZED' && verificationResult.error !== 'NO_SPREADSHEET_FOUND' && verificationResult.error !== 'SHEET_READ_ERROR' && verificationResult.error !== 'AUTH_FAILED')) && (
+          {/* 6. Unauthorized Domain in Firebase */}
+          {!isAuthenticating && verificationResult && verificationResult.error === 'UNAUTHORIZED_DOMAIN' && (
+            <div className="flex flex-col space-y-4">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 bg-amber-500/10 text-amber-400 rounded-xl border border-amber-500/20 shrink-0">
+                  <Globe className="w-6 h-6" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-white">
+                    Dominio pendiente de autorizar
+                  </h3>
+                  <p className="text-[11px] text-emerald-400 font-semibold">
+                    En Google Sheets NO necesitas ningún AppScript
+                  </p>
+                </div>
+              </div>
+
+              <div className="bg-slate-950/80 border border-slate-800 rounded-xl p-3.5 space-y-2.5 text-xs">
+                <p className="text-slate-300 leading-relaxed text-[11px]">
+                  Tu hoja <strong className="text-white">DB_cuadrantes</strong> está perfecta y no requiere macros ni scripts. Este aviso se debe a que Firebase Authentication exige registrar los dominios web autorizados de la aplicación.
+                </p>
+
+                <div className="space-y-1 pt-1">
+                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+                    1. Dominio actual para autorizar:
+                  </label>
+                  <div className="flex items-center gap-2 bg-slate-900 border border-slate-700 rounded-lg p-2 font-mono text-[11px] text-blue-300 justify-between">
+                    <span className="truncate">{currentHostname || 'Dominio actual'}</span>
+                    <button
+                      type="button"
+                      onClick={() => handleCopyText(currentHostname)}
+                      className="flex items-center gap-1 px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 text-white text-[10px] font-sans transition shrink-0 cursor-pointer"
+                    >
+                      {copiedDomain === currentHostname ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+                      <span>{copiedDomain === currentHostname ? 'Copiado' : 'Copiar'}</span>
+                    </button>
+                  </div>
+                </div>
+
+                <div className="space-y-1 pt-1">
+                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+                    2. Dominio de tu GitHub Pages:
+                  </label>
+                  <div className="flex items-center gap-2 bg-slate-900 border border-slate-700 rounded-lg p-2 font-mono text-[11px] text-emerald-300 justify-between">
+                    <span className="truncate">micajadecasa.github.io</span>
+                    <button
+                      type="button"
+                      onClick={() => handleCopyText('micajadecasa.github.io')}
+                      className="flex items-center gap-1 px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 text-white text-[10px] font-sans transition shrink-0 cursor-pointer"
+                    >
+                      {copiedDomain === 'micajadecasa.github.io' ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+                      <span>{copiedDomain === 'micajadecasa.github.io' ? 'Copiado' : 'Copiar'}</span>
+                    </button>
+                  </div>
+                </div>
+
+                <div className="pt-2 border-t border-slate-800/80 text-[11px] text-slate-400 space-y-1">
+                  <p className="font-semibold text-slate-200">Pasos en Firebase Console (solo 1 vez):</p>
+                  <ol className="list-decimal list-inside space-y-0.5 text-slate-400 pl-1 text-[11px]">
+                    <li>Abre el enlace de Firebase Console abajo.</li>
+                    <li>En <strong>Dominios autorizados</strong>, pulsa <strong>Añadir dominio</strong>.</li>
+                    <li>Pega el dominio copiado y haz clic en <strong>Guardar</strong>.</li>
+                  </ol>
+                </div>
+              </div>
+
+              <div className="flex flex-col gap-2 pt-1">
+                <a
+                  href="https://console.firebase.google.com/project/gen-lang-client-0728322381/authentication/settings"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs transition shadow-md cursor-pointer"
+                >
+                  <span>Abrir Configuración en Firebase Console</span>
+                  <ExternalLink className="w-3.5 h-3.5" />
+                </a>
+
+                <button
+                  type="button"
+                  onClick={handleGoogleLogin}
+                  className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-semibold text-xs transition cursor-pointer"
+                >
+                  <RefreshCw className="w-3.5 h-3.5" />
+                  <span>Reintentar con Google</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleDirectGsiLogin}
+                  className="w-full flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-medium text-xs transition cursor-pointer"
+                >
+                  <span>Probar conexión directa de Google (GSI)</span>
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* 7. Default / Ready to Sign In State */}
+          {!isAuthenticating && (!verificationResult || (!verificationResult.authorized && verificationResult.error !== 'USER_NOT_AUTHORIZED' && verificationResult.error !== 'NO_SPREADSHEET_FOUND' && verificationResult.error !== 'SHEET_READ_ERROR' && verificationResult.error !== 'AUTH_FAILED' && verificationResult.error !== 'UNAUTHORIZED_DOMAIN')) && (
             <div className="flex flex-col items-center text-center space-y-5">
               <div className="p-3 bg-blue-500/10 text-blue-400 rounded-xl border border-blue-500/20">
                 <Lock className="w-6 h-6" />
