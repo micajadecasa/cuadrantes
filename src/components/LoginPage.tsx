@@ -6,19 +6,19 @@ import {
   Loader2,
   FileSpreadsheet,
   CheckCircle2,
-  ExternalLink,
   LogOut,
   RefreshCw,
-  KeyRound,
   ArrowRight,
+  ShieldAlert,
 } from 'lucide-react';
 import { GasteizLogo } from '../constants/logo';
 import { googleSignIn, logout } from '../services/calendarService';
 import {
   verifyUserInDbCuadrantes,
-  extractSpreadsheetId,
   getSavedSpreadsheetId,
   saveSpreadsheetId,
+  DEFAULT_DB_SPREADSHEET_ID,
+  DEFAULT_DB_SHEET_TAB,
   VerificationResult,
   UserRole,
 } from '../services/authSheetService';
@@ -34,13 +34,13 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [cachedToken, setCachedToken] = useState<string | null>(null);
   const [verificationResult, setVerificationResult] = useState<VerificationResult | null>(null);
-  const [manualSheetInput, setManualSheetInput] = useState<string>(() => getSavedSpreadsheetId());
+  const [manualSheetInput, setManualSheetInput] = useState<string>(() => getSavedSpreadsheetId() || DEFAULT_DB_SPREADSHEET_ID);
   const [showManualInput, setShowManualInput] = useState(false);
 
   const handleGoogleLogin = async () => {
     setIsAuthenticating(true);
     setVerificationResult(null);
-    setAuthStep('Conectando con Google...');
+    setAuthStep('Abriendo ventana de inicio de sesión de Google...');
 
     try {
       const signInResult = await googleSignIn();
@@ -52,7 +52,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
       setCurrentUser(user);
       setCachedToken(accessToken);
 
-      setAuthStep('Verificando usuario en DB_cuadrantes...');
+      setAuthStep('Consultando permisos en DB_cuadrantes...');
 
       const result = await verifyUserInDbCuadrantes(
         user.email || '',
@@ -66,7 +66,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
         setAuthStep('Acceso concedido. Entrando...');
         setTimeout(() => {
           onLoginSuccess(user, result.role as UserRole, result.spreadsheetTitle);
-        }, 600);
+        }, 500);
       } else {
         if (result.error === 'NO_SPREADSHEET_FOUND' || result.error === 'SHEET_READ_ERROR') {
           setShowManualInput(true);
@@ -74,13 +74,21 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
       }
     } catch (err: any) {
       console.error('Error durante el inicio de sesión:', err);
+      let errorMsg = err?.message || 'Error al iniciar sesión con Google.';
+      if (err?.code === 'auth/popup-closed-by-user') {
+        errorMsg = 'Se cerró la ventana de inicio de sesión de Google antes de completar los permisos. Pulsa de nuevo en Continuar para permitir el acceso.';
+      } else if (err?.code === 'auth/cancelled-popup-request') {
+        errorMsg = 'Se canceló la solicitud de inicio de sesión. Inténtalo de nuevo.';
+      } else if (err?.message?.includes('403') || err?.message?.includes('permission')) {
+        errorMsg = 'Google no concedió permisos de lectura sobre la hoja de cálculo. Asegúrate de marcar todas las casillas de permisos solicitadas.';
+      }
+
       setVerificationResult({
         authorized: false,
         role: null,
         email: currentUser?.email || '',
         error: 'AUTH_FAILED',
-        errorMessage:
-          err?.message || 'Error al iniciar sesión con Google o denegación de permisos.',
+        errorMessage: errorMsg,
       });
     } finally {
       setIsAuthenticating(false);
@@ -108,7 +116,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
         setAuthStep('Acceso concedido. Entrando...');
         setTimeout(() => {
           onLoginSuccess(currentUser, result.role as UserRole, result.spreadsheetTitle);
-        }, 600);
+        }, 500);
       }
     } catch (err: any) {
       setVerificationResult({
@@ -123,7 +131,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
     }
   };
 
-  const handleSwitchAccount = async () => {
+  const handleResetAndRetry = async () => {
     await logout();
     setCurrentUser(null);
     setCachedToken(null);
@@ -172,84 +180,38 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
 
         {/* Card */}
         <div className="w-full bg-slate-900/95 border border-slate-800 rounded-2xl p-6 sm:p-8 shadow-2xl backdrop-blur-md">
-          {/* Default / Initial State */}
-          {!currentUser && !verificationResult && (
-            <div className="flex flex-col items-center text-center space-y-5">
-              <div className="p-3 bg-blue-500/10 text-blue-400 rounded-xl border border-blue-500/20">
-                <Lock className="w-6 h-6" />
-              </div>
-
-              <div className="space-y-1.5">
-                <h2 className="text-base sm:text-lg font-bold text-white">
-                  Identificación Requerida
-                </h2>
-                <p className="text-xs text-slate-400 max-w-xs mx-auto">
-                  Acceso exclusivo para personal autorizado. Inicia sesión con tu cuenta de Google para verificar tus permisos en el registro oficial.
+          {/* 1. Authenticating Spinner */}
+          {isAuthenticating && (
+            <div className="flex flex-col items-center text-center py-6 space-y-4">
+              <Loader2 className="w-10 h-10 text-blue-500 animate-spin" />
+              <div className="space-y-1">
+                <div className="text-sm font-bold text-white">{authStep}</div>
+                <p className="text-xs text-slate-400">
+                  Por favor, responde a la ventana emergente de Google para conceder los permisos.
                 </p>
               </div>
+            </div>
+          )}
 
-              {/* Official Google Sign-In Button */}
-              <button
-                type="button"
-                onClick={handleGoogleLogin}
-                disabled={isAuthenticating}
-                className="w-full flex items-center justify-center gap-3 px-5 py-3 rounded-xl bg-white hover:bg-slate-100 text-slate-900 font-semibold text-sm transition shadow-md active:scale-98 cursor-pointer disabled:opacity-60"
-              >
-                {isAuthenticating ? (
-                  <>
-                    <Loader2 className="w-4 h-4 animate-spin text-slate-700" />
-                    <span>{authStep || 'Conectando...'}</span>
-                  </>
-                ) : (
-                  <>
-                    <svg className="w-5 h-5" viewBox="0 0 24 24">
-                      <path
-                        fill="#4285F4"
-                        d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
-                      />
-                      <path
-                        fill="#34A853"
-                        d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
-                      />
-                      <path
-                        fill="#FBBC05"
-                        d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"
-                      />
-                      <path
-                        fill="#EA4335"
-                        d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"
-                      />
-                    </svg>
-                    <span>Continuar con Google (Gmail)</span>
-                  </>
-                )}
-              </button>
-
-              <div className="pt-2 text-[11px] text-slate-400 flex items-center justify-center gap-1.5 flex-wrap">
-                <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-400" />
-                <span>Base de datos vinculada:</span>
-                <span className="font-semibold text-slate-200">DB_cuadrantes</span>
-                <span className="text-[10px] px-1.5 py-0.2 bg-slate-800 text-emerald-300 rounded border border-slate-700">Hoja 1</span>
+          {/* 2. Success State transition */}
+          {!isAuthenticating && verificationResult && verificationResult.authorized && (
+            <div className="flex flex-col items-center text-center py-4 space-y-3">
+              <CheckCircle2 className="w-10 h-10 text-emerald-400 animate-in zoom-in-75" />
+              <div className="space-y-1">
+                <h3 className="text-base font-bold text-white">¡Acceso Verificado!</h3>
+                <p className="text-xs text-emerald-400 font-semibold">
+                  Rol: {verificationResult.role === 'admin' ? 'Administrador' : 'Usuario'}
+                </p>
               </div>
+              <p className="text-xs text-slate-400">Entrando a CuadrantePro...</p>
             </div>
           )}
 
-          {/* Authenticating Spinner */}
-          {isAuthenticating && (
-            <div className="flex flex-col items-center text-center py-6 space-y-3">
-              <Loader2 className="w-8 h-8 text-blue-500 animate-spin" />
-              <div className="text-sm font-semibold text-white">{authStep}</div>
-              <p className="text-xs text-slate-400">
-                Verificando la autorización en Google Sheets...
-              </p>
-            </div>
-          )}
-
-          {/* Result: User Not Authorized */}
+          {/* 3. User Not Authorized in Sheet */}
           {!isAuthenticating && verificationResult && verificationResult.error === 'USER_NOT_AUTHORIZED' && (
             <div className="flex flex-col items-center text-center space-y-4">
               <div className="p-3 bg-rose-500/10 text-rose-400 rounded-xl border border-rose-500/20">
-                <AlertCircle className="w-8 h-8" />
+                <ShieldAlert className="w-8 h-8" />
               </div>
 
               <div className="space-y-1">
@@ -275,7 +237,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
               <div className="flex flex-col w-full gap-2 pt-1">
                 <button
                   type="button"
-                  onClick={handleSwitchAccount}
+                  onClick={handleResetAndRetry}
                   className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-semibold text-xs transition cursor-pointer"
                 >
                   <RefreshCw className="w-3.5 h-3.5" />
@@ -294,7 +256,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
             </div>
           )}
 
-          {/* Result: Spreadsheet Not Found or Manual ID Configuration */}
+          {/* 4. Sheet Not Found or Sheet Read Error */}
           {!isAuthenticating && verificationResult && (verificationResult.error === 'NO_SPREADSHEET_FOUND' || verificationResult.error === 'SHEET_READ_ERROR' || showManualInput) && (
             <div className="flex flex-col space-y-4">
               <div className="flex items-center gap-3">
@@ -303,38 +265,37 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
                 </div>
                 <div>
                   <h3 className="text-sm font-bold text-white">
-                    Conectar con DB_cuadrantes
+                    Verificar Hoja DB_cuadrantes
                   </h3>
                   <p className="text-xs text-slate-400">
-                    No se localizó automáticamente la hoja en Google Drive.
+                    Comprueba el ID o enlace de la hoja de cálculo.
                   </p>
                 </div>
               </div>
 
-              <p className="text-xs text-slate-400 leading-relaxed bg-slate-950/60 p-3 rounded-xl border border-slate-800">
-                Pega a continuación el enlace completo o el ID de tu Google Sheet llamado <strong>DB_cuadrantes</strong> (debe tener las columnas <code>usuarios</code> y <code>roles</code>):
-              </p>
+              {verificationResult.errorMessage && (
+                <div className="text-xs text-rose-300 bg-rose-500/10 border border-rose-500/20 p-3 rounded-xl leading-relaxed flex items-start gap-2">
+                  <AlertCircle className="w-4 h-4 shrink-0 text-rose-400 mt-0.5" />
+                  <span>{verificationResult.errorMessage}</span>
+                </div>
+              )}
 
               <form onSubmit={handleManualSheetSubmit} className="space-y-3">
                 <div>
                   <label className="block text-xs font-semibold text-slate-300 mb-1">
-                    Enlace o ID de Google Sheets:
+                    ID o Enlace de Google Sheets:
                   </label>
                   <input
                     type="text"
                     value={manualSheetInput}
                     onChange={e => setManualSheetInput(e.target.value)}
-                    placeholder="https://docs.google.com/spreadsheets/d/.../edit"
+                    placeholder="1N6al3C2O9Sla2KuyPmBvq92duqGbq2ptTydUwrK68P0"
                     className="w-full bg-slate-950 border border-slate-700 focus:border-blue-500 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none transition font-mono"
                   />
+                  <p className="text-[11px] text-slate-500 mt-1">
+                    Pestaña vinculada por defecto: <strong>{DEFAULT_DB_SHEET_TAB}</strong>
+                  </p>
                 </div>
-
-                {verificationResult.errorMessage && (
-                  <div className="text-[11px] text-rose-400 bg-rose-500/10 border border-rose-500/20 p-2.5 rounded-lg flex items-start gap-1.5">
-                    <AlertCircle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
-                    <span>{verificationResult.errorMessage}</span>
-                  </div>
-                )}
 
                 <div className="flex items-center gap-2 pt-1">
                   <button
@@ -342,7 +303,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
                     disabled={!manualSheetInput.trim() || isAuthenticating}
                     className="flex-1 flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs transition cursor-pointer disabled:opacity-50"
                   >
-                    <span>Verificar permisos y entrar</span>
+                    <span>Reintentar verificación</span>
                     <ArrowRight className="w-3.5 h-3.5" />
                   </button>
 
@@ -359,17 +320,98 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
             </div>
           )}
 
-          {/* Success State transition */}
-          {!isAuthenticating && verificationResult && verificationResult.authorized && (
-            <div className="flex flex-col items-center text-center py-4 space-y-3">
-              <CheckCircle2 className="w-10 h-10 text-emerald-400 animate-in zoom-in-75" />
+          {/* 5. Auth Failed Error Banner (when user closes popup or permissions rejected) */}
+          {!isAuthenticating && verificationResult && verificationResult.error === 'AUTH_FAILED' && (
+            <div className="flex flex-col items-center text-center space-y-4">
+              <div className="p-3 bg-amber-500/10 text-amber-400 rounded-xl border border-amber-500/20">
+                <AlertCircle className="w-8 h-8" />
+              </div>
+
               <div className="space-y-1">
-                <h3 className="text-base font-bold text-white">¡Acceso Verificado!</h3>
-                <p className="text-xs text-emerald-400 font-semibold">
-                  Rol: {verificationResult.role === 'admin' ? 'Administrador' : 'Usuario'}
+                <h3 className="text-base font-bold text-white">Permisos no completados</h3>
+                <p className="text-xs text-slate-400 max-w-xs mx-auto leading-relaxed">
+                  {verificationResult.errorMessage || 'Es necesario conceder los permisos de Google para poder verificar tu acceso con la hoja de cálculo.'}
                 </p>
               </div>
-              <p className="text-xs text-slate-400">Entrando a CuadrantePro...</p>
+
+              <button
+                type="button"
+                onClick={handleGoogleLogin}
+                className="w-full flex items-center justify-center gap-3 px-5 py-3 rounded-xl bg-white hover:bg-slate-100 text-slate-900 font-semibold text-sm transition shadow-md cursor-pointer"
+              >
+                <svg className="w-5 h-5" viewBox="0 0 24 24">
+                  <path
+                    fill="#4285F4"
+                    d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
+                  />
+                  <path
+                    fill="#34A853"
+                    d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+                  />
+                  <path
+                    fill="#FBBC05"
+                    d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"
+                  />
+                  <path
+                    fill="#EA4335"
+                    d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"
+                  />
+                </svg>
+                <span>Volver a intentar con Google</span>
+              </button>
+            </div>
+          )}
+
+          {/* 6. Default / Ready to Sign In State */}
+          {!isAuthenticating && (!verificationResult || (!verificationResult.authorized && verificationResult.error !== 'USER_NOT_AUTHORIZED' && verificationResult.error !== 'NO_SPREADSHEET_FOUND' && verificationResult.error !== 'SHEET_READ_ERROR' && verificationResult.error !== 'AUTH_FAILED')) && (
+            <div className="flex flex-col items-center text-center space-y-5">
+              <div className="p-3 bg-blue-500/10 text-blue-400 rounded-xl border border-blue-500/20">
+                <Lock className="w-6 h-6" />
+              </div>
+
+              <div className="space-y-1.5">
+                <h2 className="text-base sm:text-lg font-bold text-white">
+                  Identificación Requerida
+                </h2>
+                <p className="text-xs text-slate-400 max-w-xs mx-auto">
+                  Acceso exclusivo para personal autorizado. Inicia sesión con tu cuenta de Google para verificar tus permisos en el registro oficial.
+                </p>
+              </div>
+
+              {/* Official Google Sign-In Button */}
+              <button
+                type="button"
+                onClick={handleGoogleLogin}
+                disabled={isAuthenticating}
+                className="w-full flex items-center justify-center gap-3 px-5 py-3 rounded-xl bg-white hover:bg-slate-100 text-slate-900 font-semibold text-sm transition shadow-md active:scale-98 cursor-pointer disabled:opacity-60"
+              >
+                <svg className="w-5 h-5" viewBox="0 0 24 24">
+                  <path
+                    fill="#4285F4"
+                    d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
+                  />
+                  <path
+                    fill="#34A853"
+                    d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+                  />
+                  <path
+                    fill="#FBBC05"
+                    d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"
+                  />
+                  <path
+                    fill="#EA4335"
+                    d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"
+                  />
+                </svg>
+                <span>Continuar con Google (Gmail)</span>
+              </button>
+
+              <div className="pt-2 text-[11px] text-slate-400 flex items-center justify-center gap-1.5 flex-wrap">
+                <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-400" />
+                <span>Base de datos:</span>
+                <span className="font-semibold text-slate-200">DB_cuadrantes</span>
+                <span className="text-[10px] px-1.5 py-0.2 bg-slate-800 text-emerald-300 rounded border border-slate-700">Hoja 1</span>
+              </div>
             </div>
           )}
         </div>
