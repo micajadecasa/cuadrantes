@@ -30,6 +30,10 @@ import { NotificationModal } from './components/NotificationModal';
 import { ConfirmModal } from './components/ConfirmModal';
 import { DriveBackupModal } from './components/DriveBackupModal';
 import { ExportPdfModal } from './components/ExportPdfModal';
+import { LoginPage } from './components/LoginPage';
+import { UserRole } from './services/authSheetService';
+import { logout } from './services/calendarService';
+import { User } from 'firebase/auth';
 import { QuadrantBackupData } from './services/driveService';
 import { Calendar as CalendarIcon } from 'lucide-react';
 
@@ -150,6 +154,16 @@ export default function App() {
   const [isDriveBackupOpen, setIsDriveBackupOpen] = useState(false);
   const [driveBackupInitialMode, setDriveBackupInitialMode] = useState<'save' | 'load'>('save');
   const [isExportPdfOpen, setIsExportPdfOpen] = useState(false);
+
+  // Auth gate state (DB_cuadrantes verification)
+  const [authenticatedUser, setAuthenticatedUser] = useState<User | null>(null);
+  const [userRole, setUserRole] = useState<UserRole | null>(null);
+
+  const handleLogout = async () => {
+    await logout();
+    setAuthenticatedUser(null);
+    setUserRole(null);
+  };
 
   // Persistence
   useEffect(() => {
@@ -430,6 +444,18 @@ export default function App() {
     setIsExportPdfOpen(true);
   };
 
+  // Portada de acceso con verificación en DB_cuadrantes
+  if (!authenticatedUser || !userRole) {
+    return (
+      <LoginPage
+        onLoginSuccess={(user, role) => {
+          setAuthenticatedUser(user);
+          setUserRole(role);
+        }}
+      />
+    );
+  }
+
   return (
     <div className="min-h-screen bg-slate-100 text-slate-900 flex flex-col font-sans">
       {/* Top Header */}
@@ -460,6 +486,9 @@ export default function App() {
           setIsEmployeeModalOpen(true);
         }}
         onExportPDF={handleExportPDF}
+        currentUser={authenticatedUser}
+        currentUserRole={userRole}
+        onLogout={handleLogout}
       />
 
       {isMobileView ? (

@@ -13,6 +13,9 @@ import {
   Cloud,
   Upload,
   CalendarX,
+  User as UserIcon,
+  LogOut,
+  ShieldCheck,
 } from 'lucide-react';
 import { GasteizLogo } from '../constants/logo';
 
@@ -34,6 +37,9 @@ interface HeaderProps {
   onOpenNotifications: () => void;
   onOpenAddEmployee: () => void;
   onExportPDF: () => void;
+  currentUser?: { email?: string | null; displayName?: string | null } | null;
+  currentUserRole?: 'admin' | 'user' | null;
+  onLogout?: () => void;
 }
 
 const MONTH_NAMES_ES = [
@@ -59,6 +65,9 @@ export const Header: React.FC<HeaderProps> = ({
   onOpenNotifications,
   onOpenAddEmployee,
   onExportPDF,
+  currentUser,
+  currentUserRole,
+  onLogout,
 }) => {
   const handlePrevMonth = () => {
     if (month === 1) {
@@ -267,6 +276,38 @@ export const Header: React.FC<HeaderProps> = ({
           >
             <RotateCcw className="w-3.5 h-3.5" />
           </button>
+
+          {/* User Profile & Logout */}
+          {currentUser && (
+            <div className="flex items-center gap-2 pl-2 border-l border-slate-700">
+              <div className="flex items-center gap-1.5 bg-slate-800/90 border border-slate-700 rounded-lg px-2 py-1 text-xs">
+                <UserIcon className="w-3.5 h-3.5 text-slate-400" />
+                <span className="font-medium text-slate-200 max-w-[120px] truncate hidden sm:inline" title={currentUser.email || ''}>
+                  {currentUser.email?.split('@')[0]}
+                </span>
+                <span
+                  className={`text-[10px] font-bold px-1.5 py-0.2 rounded ${
+                    currentUserRole === 'admin'
+                      ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
+                      : 'bg-blue-500/20 text-blue-300 border border-blue-500/30'
+                  }`}
+                >
+                  {currentUserRole === 'admin' ? 'ADMIN' : 'USER'}
+                </span>
+              </div>
+
+              {onLogout && (
+                <button
+                  type="button"
+                  onClick={onLogout}
+                  className="p-1.5 rounded-lg bg-slate-800 hover:bg-rose-500/20 text-slate-400 hover:text-rose-400 border border-slate-700 transition cursor-pointer"
+                  title="Cerrar sesión de Google y salir a la portada"
+                >
+                  <LogOut className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
+          )}
         </div>
       </div>
     </header>
