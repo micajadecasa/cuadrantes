@@ -1,5 +1,6 @@
 import {
   CompanyData,
+  ConvenioYearTable,
   DangerBonusType,
   DevengoLine,
   PayrollCalculationResult,
@@ -16,31 +17,20 @@ export const GASTEIZ_COMPANY_DEFAULT: CompanyData = {
   ccc: '01/1033049/75',
 };
 
-// Official Security Guard salary tables according to the Convenio Colectivo Estatal de Empresas de Seguridad
-interface ConvenioYearTable {
-  baseDaily: number;
-  quinquenioDaily: number;
-  trienioDaily: number;
-  peligrosidadDaily: {
-    sin_arma: number;
-    con_arma: number;
-    transporte_fondos: number;
-    ninguno: number;
-  };
-  transporteDaily: number;
-  vestuarioDaily: number;
-  precioHoraNocturna: number;
-  precioHoraFestiva: number;
-  precioHoraExtra: number;
-  pagaBeneficiosDefecto: number;
-  prorrataPagasExtrasDefecto: number;
-  // MEI (Mecanismo de Equidad Intergeneracional)
-  meiTrabajadorPct: number;
-  meiEmpresaPct: number;
-}
+export const BOE_OFFICIAL_URL = 'https://www.boe.es/diario_boe/txt.php?id=BOE-A-2026-8569';
+export const BOE_OFFICIAL_REFERENCE = 'BOE-A-2026-8569';
+export const BOE_RESOLUCION_TITLE = 'Resolución de 8 de abril de 2026, Dirección General de Trabajo (Convenio Colectivo Estatal de Seguridad Privada)';
 
-export const CONVENIO_TABLES: Record<number, ConvenioYearTable> = {
+export const STORAGE_KEY_CUSTOM_BOE_TABLES = 'gasteiz_boe_convenio_tables_custom';
+
+export const DEFAULT_CONVENIO_TABLES: Record<number, ConvenioYearTable> = {
   2024: {
+    year: 2024,
+    boeReference: 'BOE-A-2023-23912',
+    boeUrl: 'https://www.boe.es/buscar/doc.php?id=BOE-A-2023-23912',
+    resolucionDate: 'Resolución D.G. Trabajo Tablas 2024',
+    jornadaAnual: 1782,
+    jornadaMensual: 162,
     baseDaily: 36.9747,
     quinquenioDaily: 5.8333,
     trienioDaily: 2.33,
@@ -61,6 +51,12 @@ export const CONVENIO_TABLES: Record<number, ConvenioYearTable> = {
     meiEmpresaPct: 0.58,
   },
   2025: {
+    year: 2025,
+    boeReference: 'BOE-A-2024-21950',
+    boeUrl: 'https://www.boe.es/buscar/doc.php?id=BOE-A-2024-21950',
+    resolucionDate: 'Resolución D.G. Trabajo Tablas 2025',
+    jornadaAnual: 1782,
+    jornadaMensual: 162,
     baseDaily: 38.0833,
     quinquenioDaily: 6.01,
     trienioDaily: 2.4,
@@ -81,27 +77,38 @@ export const CONVENIO_TABLES: Record<number, ConvenioYearTable> = {
     meiEmpresaPct: 0.67,
   },
   2026: {
-    // Official values from the Gasteiz de Vigilancia payslip (Abril 2026)
-    baseDaily: 38.7093,
-    quinquenioDaily: 6.1147,
+    year: 2026,
+    boeReference: BOE_OFFICIAL_REFERENCE,
+    boeUrl: BOE_OFFICIAL_URL,
+    resolucionDate: BOE_RESOLUCION_TITLE,
+    jornadaAnual: 1782,
+    jornadaMensual: 162,
+    baseDaily: 38.7093, // 1.161,28 € / mes para 30 días
+    quinquenioDaily: 6.1147, // 183,44 € / mes
     trienioDaily: 2.45,
     peligrosidadDaily: {
-      sin_arma: 5.9967,
+      sin_arma: 5.9967, // 179,90 € / mes
       con_arma: 6.78,
       transporte_fondos: 7.4,
       ninguno: 0,
     },
-    transporteDaily: 4.5937,
-    vestuarioDaily: 3.7423,
-    precioHoraNocturna: 1.26,
-    precioHoraFestiva: 1.02,
-    precioHoraExtra: 12.2,
+    transporteDaily: 4.5937, // 137,81 € / mes
+    vestuarioDaily: 3.7423, // 112,27 € / mes
+    precioHoraNocturna: 1.26, // 1,26 € / hora
+    precioHoraFestiva: 1.02, // 1,02 € / hora
+    precioHoraExtra: 12.2, // 12,20 € / hora
     pagaBeneficiosDefecto: 127.05,
     prorrataPagasExtrasDefecto: 254.1,
-    meiTrabajadorPct: 0.15,
-    meiEmpresaPct: 0.75,
+    meiTrabajadorPct: 0.15, // MEI 2026 trabajador
+    meiEmpresaPct: 0.75, // MEI 2026 patronal
   },
   2027: {
+    year: 2027,
+    boeReference: BOE_OFFICIAL_REFERENCE,
+    boeUrl: BOE_OFFICIAL_URL,
+    resolucionDate: 'Convenio Colectivo Seguridad Privada (Proyección 2027)',
+    jornadaAnual: 1782,
+    jornadaMensual: 162,
     baseDaily: 39.677,
     quinquenioDaily: 6.2676,
     trienioDaily: 2.51,
@@ -123,20 +130,79 @@ export const CONVENIO_TABLES: Record<number, ConvenioYearTable> = {
   },
 };
 
+export const CONVENIO_TABLES = DEFAULT_CONVENIO_TABLES;
+
+/**
+ * Loads custom table modifications saved by admin, or returns default
+ */
+export function getStoredConvenioYearTable(year: number): ConvenioYearTable {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY_CUSTOM_BOE_TABLES);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (parsed && parsed[year]) {
+        return parsed[year];
+      }
+    }
+  } catch (e) {
+    // Fallback to default
+  }
+  return getConvenioYearTable(year);
+}
+
+/**
+ * Saves custom table modifications for a specific year
+ */
+export function saveStoredConvenioYearTable(
+  table: ConvenioYearTable,
+  userEmail?: string
+): void {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY_CUSTOM_BOE_TABLES);
+    const existing: Record<number, ConvenioYearTable> = raw ? JSON.parse(raw) : {};
+    existing[table.year] = {
+      ...table,
+      lastModifiedBy: userEmail || 'Administrador',
+      lastModifiedAt: new Date().toISOString(),
+    };
+    localStorage.setItem(STORAGE_KEY_CUSTOM_BOE_TABLES, JSON.stringify(existing));
+  } catch (e) {
+    console.error('Error saving custom BOE table:', e);
+  }
+}
+
+/**
+ * Restores a year's table to the statutory BOE-A-2026-8569 default values
+ */
+export function resetStoredConvenioYearTable(year: number): ConvenioYearTable {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY_CUSTOM_BOE_TABLES);
+    if (raw) {
+      const existing: Record<number, ConvenioYearTable> = JSON.parse(raw);
+      delete existing[year];
+      localStorage.setItem(STORAGE_KEY_CUSTOM_BOE_TABLES, JSON.stringify(existing));
+    }
+  } catch (e) {
+    console.error('Error resetting BOE table:', e);
+  }
+  return getConvenioYearTable(year);
+}
+
 /**
  * Helper to get the convenio rates for any year, falling back to 2026 if not explicitly mapped
  */
 export function getConvenioYearTable(year: number): ConvenioYearTable {
-  if (CONVENIO_TABLES[year]) {
-    return CONVENIO_TABLES[year];
+  if (DEFAULT_CONVENIO_TABLES[year]) {
+    return DEFAULT_CONVENIO_TABLES[year];
   }
   if (year > 2027) {
     // Escalate with +2.5% annual projection
     const diff = year - 2027;
     const factor = Math.pow(1.025, diff);
-    const base2027 = CONVENIO_TABLES[2027];
+    const base2027 = DEFAULT_CONVENIO_TABLES[2027];
     return {
       ...base2027,
+      year,
       baseDaily: round(base2027.baseDaily * factor, 4),
       quinquenioDaily: round(base2027.quinquenioDaily * factor, 4),
       peligrosidadDaily: {
@@ -154,7 +220,7 @@ export function getConvenioYearTable(year: number): ConvenioYearTable {
       meiEmpresaPct: 0.83,
     };
   }
-  return CONVENIO_TABLES[2026];
+  return DEFAULT_CONVENIO_TABLES[2026];
 }
 
 /**
@@ -211,9 +277,10 @@ const MONTH_NAMES_ES = [
 export function calculateSecurityGuardPayroll(
   worker: WorkerPayrollProfile,
   params: PayrollParameters,
-  company: CompanyData = GASTEIZ_COMPANY_DEFAULT
+  company: CompanyData = GASTEIZ_COMPANY_DEFAULT,
+  customTable?: ConvenioYearTable
 ): PayrollCalculationResult {
-  const table = getConvenioYearTable(params.year);
+  const table = customTable || getStoredConvenioYearTable(params.year);
   const dias = params.diasLiquidacion || 30;
 
   // 1. DEVENGOS

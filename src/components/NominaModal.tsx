@@ -17,6 +17,9 @@ import {
   GASTEIZ_COMPANY_DEFAULT,
   SAMPLE_PDF_WORKER_2026,
   getConvenioYearTable,
+  getStoredConvenioYearTable,
+  BOE_OFFICIAL_REFERENCE,
+  BOE_OFFICIAL_URL,
   estimateAlavaIRPFRate,
 } from '../services/payrollCalculator';
 import { OfficialPayslip } from './OfficialPayslip';
@@ -34,6 +37,8 @@ import {
   Building2,
   RefreshCw,
   Sparkles,
+  ExternalLink,
+  Scale,
 } from 'lucide-react';
 
 interface NominaModalProps {
@@ -44,6 +49,7 @@ interface NominaModalProps {
   employees: Employee[];
   statsMap?: Map<string, EmployeeMonthStats>;
   convenio: ConvenioSettings;
+  onOpenConvenio?: () => void;
 }
 
 const MONTH_NAMES_ES = [
@@ -59,6 +65,7 @@ export const NominaModal: React.FC<NominaModalProps> = ({
   employees,
   statsMap,
   convenio,
+  onOpenConvenio,
 }) => {
   // Navigation tabs: 'preview' (Official Payslip view) or 'controls' (Selectors and parameters)
   const [activeTab, setActiveTab] = useState<'preview' | 'controls'>('preview');
@@ -253,12 +260,26 @@ export const NominaModal: React.FC<NominaModalProps> = ({
                 </span>
               </div>
               <p className="text-xs text-slate-400">
-                Cálculo del sueldo neto mensual, cotizaciones a la Seguridad Social (MEI {getConvenioYearTable(calcYear).meiTrabajadorPct}%), IRPF Álava y modelo oficial idéntico al PDF.
+                Cálculo del sueldo neto mensual según tablas del <strong className="text-blue-300 font-mono">{BOE_OFFICIAL_REFERENCE}</strong>, cotizaciones SS (MEI {getStoredConvenioYearTable(calcYear).meiTrabajadorPct}%), IRPF Foral de Álava y modelo oficial idéntico al PDF de GV.
               </p>
             </div>
           </div>
 
           <div className="flex items-center gap-2">
+            {onOpenConvenio && (
+              <button
+                onClick={() => {
+                  onClose();
+                  onOpenConvenio();
+                }}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition shadow-xs cursor-pointer"
+                title="Configurar y modificar las tablas del Convenio BOE-A-2026-8569"
+              >
+                <Scale className="w-3.5 h-3.5 text-blue-400" />
+                <span>Configurar BOE</span>
+              </button>
+            )}
+
             <button
               onClick={handleLoadExactPDFSample}
               className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white transition shadow-xs cursor-pointer"

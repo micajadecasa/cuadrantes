@@ -1,5 +1,35 @@
 export type DangerBonusType = 'sin_arma' | 'con_arma' | 'transporte_fondos' | 'ninguno';
 
+export interface ConvenioYearTable {
+  year: number;
+  boeReference: string; // "BOE-A-2026-8569"
+  boeUrl: string; // "https://www.boe.es/diario_boe/txt.php?id=BOE-A-2026-8569"
+  resolucionDate: string; // "Resolución de 8 de abril de 2026, Dirección General de Trabajo"
+  jornadaAnual: number; // 1782
+  jornadaMensual: number; // 162
+  baseDaily: number; // 38.7093 (1.161,28 €/mes para 30 días)
+  quinquenioDaily: number; // 6.1147 (183.44 €/mes)
+  trienioDaily: number; // 2.45
+  peligrosidadDaily: {
+    sin_arma: number; // 5.9967 (179.90 €/mes)
+    con_arma: number; // 6.78
+    transporte_fondos: number; // 7.40
+    ninguno: number; // 0
+  };
+  transporteDaily: number; // 4.5937 (137.81 €/mes)
+  vestuarioDaily: number; // 3.7423 (112.27 €/mes)
+  precioHoraNocturna: number; // 1.26 €/h
+  precioHoraFestiva: number; // 1.02 €/h
+  precioHoraExtra: number; // 12.20 €/h
+  pagaBeneficiosDefecto: number; // 127.05 €
+  prorrataPagasExtrasDefecto: number; // 254.10 €
+  // MEI (Mecanismo de Equidad Intergeneracional)
+  meiTrabajadorPct: number; // 0.15% en 2026
+  meiEmpresaPct: number; // 0.75% en 2026
+  lastModifiedBy?: string;
+  lastModifiedAt?: string;
+}
+
 export interface CompanyData {
   nombre: string;
   domicilio: string;

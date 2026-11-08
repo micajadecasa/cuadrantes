@@ -32,6 +32,7 @@ import { DriveBackupModal } from './components/DriveBackupModal';
 import { ExportPdfModal } from './components/ExportPdfModal';
 import { NominaModal } from './components/NominaModal';
 import { LoginPage } from './components/LoginPage';
+import { TechnicalOperationsHub } from './components/TechnicalOperationsHub';
 import { UserRole } from './services/authSheetService';
 import { logout } from './services/calendarService';
 import { User } from 'firebase/auth';
@@ -139,6 +140,7 @@ export default function App() {
   }, [yearAssignmentsMap, year, month]);
 
   // UI state
+  const [activeView, setActiveView] = useState<'hub' | 'cuadrante'>('hub');
   const [isMobileView, setIsMobileView] = useState(false);
   const [selectedShiftCode, setSelectedShiftCode] = useState<string | null>(null);
 
@@ -452,7 +454,51 @@ export default function App() {
         onLoginSuccess={(user, role) => {
           setAuthenticatedUser(user);
           setUserRole(role);
+          setActiveView('hub');
         }}
+      />
+    );
+  }
+
+  // Technical Operations Hub: screen selection canvas after login
+  if (authenticatedUser && activeView === 'hub') {
+    return (
+      <TechnicalOperationsHub
+        currentUser={authenticatedUser}
+        currentUserRole={userRole}
+        year={year}
+        month={month}
+        serviceName={serviceName}
+        employees={employees}
+        daysCount={days.length}
+        onSelectScreen={(screen) => {
+          if (screen === 'cuadrante') {
+            setActiveView('cuadrante');
+          } else if (screen === 'nominas') {
+            setActiveView('cuadrante');
+            setIsNominaOpen(true);
+          } else if (screen === 'convenio') {
+            setActiveView('cuadrante');
+            setIsConvenioOpen(true);
+          } else if (screen === 'reportes') {
+            setActiveView('cuadrante');
+            setIsReportOpen(true);
+          } else if (screen === 'empleados') {
+            setActiveView('cuadrante');
+            setEmployeeToEdit(null);
+            setIsEmployeeModalOpen(true);
+          } else if (screen === 'drive') {
+            setActiveView('cuadrante');
+            setDriveBackupInitialMode('save');
+            setIsDriveBackupOpen(true);
+          } else if (screen === 'calendar') {
+            setActiveView('cuadrante');
+            setIsGoogleSyncOpen(true);
+          }
+        }}
+        onLogout={handleLogout}
+        onToggleMobileView={() => setIsMobileView(true)}
+        onExportPDF={handleExportPDF}
       />
     );
   }
@@ -469,6 +515,7 @@ export default function App() {
         onMonthChange={setMonth}
         onServiceNameChange={setServiceName}
         onToggleMobileView={() => setIsMobileView(prev => !prev)}
+        onOpenHub={() => setActiveView('hub')}
         onOpenConvenio={() => setIsConvenioOpen(true)}
         onOpenReport={() => setIsReportOpen(true)}
         onOpenNomina={() => setIsNominaOpen(true)}
@@ -647,6 +694,8 @@ export default function App() {
         onSaveConvenio={setConvenio}
         customHolidays={customHolidays}
         onUpdateHolidays={setCustomHolidays}
+        currentUserRole={userRole}
+        currentYear={year}
       />
 
       <ReportModal
@@ -730,6 +779,7 @@ export default function App() {
         employees={employees}
         statsMap={statsMap}
         convenio={convenio}
+        onOpenConvenio={() => setIsConvenioOpen(true)}
       />
     </div>
   );

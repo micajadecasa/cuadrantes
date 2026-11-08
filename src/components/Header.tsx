@@ -17,6 +17,7 @@ import {
   LogOut,
   ShieldCheck,
   Receipt,
+  LayoutGrid,
 } from 'lucide-react';
 import { GasteizLogo } from '../constants/logo';
 
@@ -29,6 +30,7 @@ interface HeaderProps {
   onMonthChange: (month: number) => void;
   onServiceNameChange: (name: string) => void;
   onToggleMobileView: () => void;
+  onOpenHub?: () => void;
   onOpenConvenio: () => void;
   onOpenReport: () => void;
   onOpenNomina?: () => void;
@@ -58,6 +60,7 @@ export const Header: React.FC<HeaderProps> = ({
   onMonthChange,
   onServiceNameChange,
   onToggleMobileView,
+  onOpenHub,
   onOpenConvenio,
   onOpenReport,
   onOpenNomina,
@@ -177,6 +180,18 @@ export const Header: React.FC<HeaderProps> = ({
 
         {/* Action Buttons in PC View */}
         <div className="flex flex-wrap items-center gap-2">
+          {/* Centro de Mando / Hub Selector */}
+          {onOpenHub && (
+            <button
+              onClick={onOpenHub}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-black rounded-lg bg-blue-600 hover:bg-blue-500 text-white transition shadow-sm cursor-pointer border border-blue-400/40 ring-1 ring-blue-400/30"
+              title="Volver al Centro de Mando y selector de pantallas"
+            >
+              <LayoutGrid className="w-3.5 h-3.5" />
+              <span>Centro de Mando</span>
+            </button>
+          )}
+
           {/* Mobile / Worker View toggle */}
           <button
             onClick={onToggleMobileView}
